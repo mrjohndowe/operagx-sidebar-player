@@ -2,7 +2,7 @@
 {
   "manifest_version": 3,
   "name": "Adult Video Sidebar",
-  "version": "3.1.1",
+  "version": "3.1.2",
   "description": "Opera GX embedded video sidebar browser",
     "permissions": [
         "tabs",

@@ -1,4 +1,4 @@
-# Adult Video Sidebar GX v1.6
+# Adult Video Sidebar GX v3.1.2
 
 Custom Opera GX sidebar extension. Includes your own sidebar panel, quick buttons for Pornhub/XVideos/XFree/XXXFollow, address bar, navigation history, and Open Tab fallback.
 
