@@ -1,0 +1,44 @@
+
+{
+  "manifest_version": 3,
+  "name": "Adult Video Sidebar",
+  "version": "3.1.1",
+  "description": "Opera GX embedded video sidebar browser",
+    "permissions": [
+        "tabs",
+    "storage"
+    ],
+    "host_permissions": [
+        "https://www.pornhub.com/*",
+        "https://pornhub.com/*",
+        "https://www.xvideos.com/*",
+        "https://xvideos.com/*",
+        "https://www.xfree.com/*",
+        "https://xfree.com/*",
+        "https://www.xxxfollow.com/*",
+        "https://xxxfollow.com/*"
+    ],
+    "web_accessible_resources": [
+    {
+        "resources": ["icons/icon.png"],
+        "matches": ["<all_urls>"]
+        }
+    ],
+    "background": {
+        "service_worker": "background.js"
+    },
+    "sidebar_action": {
+        "default_title": "Adult Video Sidebar",
+        "default_panel": "sidebar.html",
+        "default_icon": "icons/icon.png"
+    },
+    "icons": {
+        "48": "icons/icon.png",
+        "128": "icons/icon.png"
+    },
+    "browser_specific_settings": {
+        "gecko": {
+            "id": "adult-video-sidebar@mrjohndowe.com"
+        }
+    }
+}

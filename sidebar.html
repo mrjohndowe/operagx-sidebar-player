@@ -1,0 +1,87 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Adult Video Sidebar</title>
+  <link rel="stylesheet" href="sidebar.css">
+</head>
+<body>
+
+<header>
+  <div class="browser-header">
+    <div class="navigation">
+      <button id="back" title="Refresh source">←</button>
+      <button id="forward" title="Refresh source">→</button>
+      <button id="reload" title="Reload player">⟳</button>
+    </div>
+
+    <div class="address-container">
+      <span>🔒</span>
+      <input id="address" placeholder="Video URL" readonly>
+    </div>
+
+    <button id="refresh" title="Add current video">＋</button>
+  </div>
+
+  <div class="brand">
+    <span class="logo">AV</span>
+    <span>VIDEO SIDEBAR</span>
+    <span id="status" class="status">READY</span>
+  </div>
+</header>
+
+<section class="video-options">
+  <button id="addVideo">＋ Add Video</button>
+  <button id="followTab" class="active">Auto-add: ON</button>
+  <button id="clearVideos">Clear</button>
+</section>
+
+<section class="playlist-wrap">
+  <div class="playlist-heading">
+    <span>PLAYLIST</span>
+    <span id="videoCount">0 videos</span>
+  </div>
+
+  <div id="playlist" class="playlist">
+    <div class="playlist-empty">No videos saved</div>
+  </div>
+</section>
+
+<main>
+  <div class="player-container">
+    <iframe
+      id="videoPlayer"
+      src="about:blank"
+      allow="autoplay; fullscreen; picture-in-picture"
+      allowfullscreen>
+    </iframe>
+
+    <div id="empty">
+      <div class="empty-icon">▶</div>
+      <h3>Select a video</h3>
+      <p>Add videos from browser tabs.</p>
+    </div>
+  </div>
+
+  <section class="video-information">
+    <div class="label">NOW PLAYING</div>
+    <div id="videoTitle">No video selected</div>
+    <div id="videoURL"></div>
+
+    <div class="source-info">
+      <span>Source tab:</span>
+      <span id="sourceTab">—</span>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <span>Multi-video playlist</span>
+  <span id="playbackStatus">Ready</span>
+</footer>
+
+<script src="sidebar.js"></script>
+</body>
+</html>
