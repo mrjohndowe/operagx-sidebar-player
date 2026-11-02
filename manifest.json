@@ -2,11 +2,12 @@
 {
   "manifest_version": 3,
   "name": "Adult Video Sidebar",
-  "version": "3.1.2",
+  "version": "3.1.4",
   "description": "Opera GX embedded video sidebar browser",
     "permissions": [
-        "tabs",
-    "storage"
+    "storage",
+    "tabs",
+    "activeTab"
     ],
     "host_permissions": [
         "https://www.pornhub.com/*",

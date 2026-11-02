@@ -1,7 +1,11 @@
 
 "use strict";
 
-const STORAGE_KEYS = {
+/* =========================================================
+   STORAGE
+========================================================= */
+
+const STORAGE = {
     playlists: "avsc_named_playlists_v1",
     current: "avsc_sidebar_playlist_v1",
     activeName: "avsc_active_playlist_name",
@@ -11,6 +15,7 @@ const STORAGE_KEYS = {
 let playlists = {};
 let currentPlaylist = [];
 let activePlaylistName = "Untitled Playlist";
+
 let autoAdd = false;
 let selectedVideoId = null;
 let currentVideoUrl = null;
@@ -18,10 +23,14 @@ let currentVideoTitle = null;
 let lastAutoAddedUrl = null;
 let saveTimer = null;
 
-const $ = (id) => document.getElementById(id);
+const $ = id => document.getElementById(id);
 
 function createId() {
-    return `${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+    return `${Date.now()}_${Math.random().toString(36).slice(2)}`;
+}
+
+function clone(value) {
+    return JSON.parse(JSON.stringify(value));
 }
 
 function normalizeUrl(url) {
@@ -34,34 +43,56 @@ function normalizeUrl(url) {
     }
 }
 
-function setSaveStatus(message) {
-    $("saveStatus").textContent = message;
-}
+/* =========================================================
+   STORAGE MANAGEMENT
+========================================================= */
 
-function updateStatus(active = true) {
-    $("statusDot").classList.toggle("inactive", !active);
+function saveStorageNow() {
+    const data = {
+        [STORAGE.playlists]: playlists,
+        [STORAGE.current]: currentPlaylist,
+        [STORAGE.activeName]: activePlaylistName,
+        [STORAGE.autoAdd]: autoAdd
+    };
+
+    chrome.storage.local.set(data, () => {
+        if (chrome.runtime.lastError) {
+            setSaveStatus("SAVE FAILED");
+            console.error(
+                "Playlist save failed:",
+                chrome.runtime.lastError.message
+            );
+            return;
+        }
+
+        setSaveStatus("Saved");
+    });
 }
 
 function saveStorage() {
     clearTimeout(saveTimer);
     setSaveStatus("Saving...");
 
-    saveTimer = setTimeout(() => {
-        chrome.storage.local.set({
-            [STORAGE_KEYS.playlists]: playlists,
-            [STORAGE_KEYS.current]: currentPlaylist,
-            [STORAGE_KEYS.activeName]: activePlaylistName,
-            [STORAGE_KEYS.autoAdd]: autoAdd
-        }, () => {
-            if (chrome.runtime.lastError) {
-                setSaveStatus("Save failed");
-                console.error(chrome.runtime.lastError);
-                return;
-            }
-            setSaveStatus("All changes saved");
-        });
-    }, 150);
+    saveTimer = setTimeout(saveStorageNow, 200);
 }
+
+function setSaveStatus(message) {
+    const element = $("saveStatus");
+
+    if (element) {
+        element.textContent = message;
+    }
+}
+
+function persistAndRender() {
+    renderPlaylist();
+    updateActiveName();
+    saveStorage();
+}
+
+/* =========================================================
+   PLAYLIST UI
+========================================================= */
 
 function updateActiveName() {
     $("activePlaylistName").textContent = activePlaylistName;
@@ -69,34 +100,36 @@ function updateActiveName() {
 
 function renderSavedPlaylists() {
     const select = $("savedPlaylistSelect");
-    const previousValue = select.value;
+    const previous = select.value;
 
     select.innerHTML = "";
 
-    const names = Object.keys(playlists).sort((a, b) => a.localeCompare(b));
+    const names = Object.keys(playlists).sort((a, b) =>
+        a.localeCompare(b)
+    );
 
-    if (names.length === 0) {
+    if (!names.length) {
         const option = document.createElement("option");
         option.value = "";
         option.textContent = "No saved playlists";
         select.appendChild(option);
     } else {
-        for (const name of names) {
+        names.forEach(name => {
             const option = document.createElement("option");
             option.value = name;
             option.textContent = name;
             select.appendChild(option);
-        }
+        });
 
-        if (names.includes(previousValue)) {
-            select.value = previousValue;
+        if (names.includes(previous)) {
+            select.value = previous;
         } else if (names.includes(activePlaylistName)) {
             select.value = activePlaylistName;
         }
     }
 
-    $("deletePlaylistBtn").disabled = names.length === 0;
-    $("loadPlaylistBtn").disabled = names.length === 0;
+    $("loadPlaylistBtn").disabled = !names.length;
+    $("deletePlaylistBtn").disabled = !names.length;
 }
 
 function renderPlaylist() {
@@ -106,7 +139,7 @@ function renderPlaylist() {
     $("playlistCount").textContent =
         `${currentPlaylist.length} video${currentPlaylist.length === 1 ? "" : "s"}`;
 
-    if (currentPlaylist.length === 0) {
+    if (!currentPlaylist.length) {
         const empty = document.createElement("div");
         empty.className = "empty-state";
         empty.textContent = "Your playlist is empty.";
@@ -122,11 +155,11 @@ function renderPlaylist() {
             item.classList.add("selected");
         }
 
-        const playButton = document.createElement("button");
-        playButton.className = "playlist-play";
-        playButton.title = "Play video";
-        playButton.textContent = "▶";
-        playButton.addEventListener("click", () => playVideo(video));
+        const play = document.createElement("button");
+        play.className = "playlist-play";
+        play.textContent = "▶";
+        play.title = "Play";
+        play.addEventListener("click", () => playVideo(video));
 
         const info = document.createElement("div");
         info.className = "playlist-info";
@@ -134,55 +167,77 @@ function renderPlaylist() {
         const title = document.createElement("div");
         title.className = "playlist-item-title";
         title.textContent = video.title || `Video ${index + 1}`;
-        title.title = video.title || video.url;
 
         const url = document.createElement("div");
         url.className = "playlist-item-url";
         url.textContent = video.url;
-        url.title = video.url;
 
         info.append(title, url);
         info.addEventListener("click", () => playVideo(video));
 
-        const removeButton = document.createElement("button");
-        removeButton.className = "playlist-remove";
-        removeButton.title = "Remove video";
-        removeButton.textContent = "×";
-        removeButton.addEventListener("click", () => removeVideo(video.id));
+        const remove = document.createElement("button");
+        remove.className = "playlist-remove";
+        remove.textContent = "×";
+        remove.title = "Remove";
+        remove.addEventListener("click", () => removeVideo(video.id));
 
-        item.append(playButton, info, removeButton);
+        item.append(play, info, remove);
         container.appendChild(item);
     });
 }
 
-function persistAndRender() {
+/* =========================================================
+   VIDEO PLAYER
+========================================================= */
+
+function playVideo(video) {
+    if (!video || !video.url) return;
+
+    selectedVideoId = video.id;
+    currentVideoUrl = video.url;
+    currentVideoTitle = video.title || "Video";
+
+    $("videoPlayer").src = video.url;
+    $("playerTitle").textContent = currentVideoTitle;
+
     renderPlaylist();
-    updateActiveName();
-    saveStorage();
 }
 
-function addVideo(url, title = "Untitled Video") {
+function openVideoInTab() {
+    if (!currentVideoUrl) {
+        alert("Select a video first.");
+        return;
+    }
+
+    chrome.tabs.create({ url: currentVideoUrl });
+}
+
+/* =========================================================
+   ADD / REMOVE VIDEOS
+========================================================= */
+
+function addVideo(url, title = "Detected Video") {
     if (!url || !/^https?:\/\//i.test(url)) {
-        alert("No valid video URL was detected.");
+        alert("No valid video URL detected.");
         return;
     }
 
     const normalized = normalizeUrl(url);
 
-    const existing = currentPlaylist.find(
-        video => normalizeUrl(video.url) === normalized
+    const existing = currentPlaylist.find(video =>
+        normalizeUrl(video.url) === normalized
     );
 
     if (existing) {
         playVideo(existing);
-        setSaveStatus("Video already in playlist");
+        setSaveStatus("Already in playlist");
         return;
     }
 
     const video = {
         id: createId(),
         url,
-        title: title || "Untitled Video",
+        title: title || "Detected Video",
         addedAt: Date.now()
     };
 
@@ -203,78 +258,90 @@ function removeVideo(id) {
     persistAndRender();
 }
 
-function playVideo(video) {
-    if (!video || !video.url) return;
+function clearCurrentPlaylist() {
+    if (!currentPlaylist.length) return;
 
-    selectedVideoId = video.id;
-    currentVideoUrl = video.url;
-    currentVideoTitle = video.title;
-
-    $("videoPlayer").src = video.url;
-    $("playerTitle").textContent = video.title || video.url;
-
-    renderPlaylist();
-}
-
-function saveNamedPlaylist() {
-    const defaultName = activePlaylistName === "Untitled Playlist"
-        ? ""
-        : activePlaylistName;
-
-    const enteredName = prompt("Enter a name for this playlist:", defaultName);
-
-    if (enteredName === null) return;
-
-    const name = enteredName.trim();
-
-    if (!name) {
-        alert("Please enter a playlist name.");
+    if (!confirm("Clear all videos from the active playlist?")) {
         return;
     }
 
-    playlists[name] = JSON.parse(JSON.stringify(currentPlaylist));
+    currentPlaylist = [];
+    selectedVideoId = null;
+    currentVideoUrl = null;
+
+    $("videoPlayer").src = "about:blank";
+    $("playerTitle").textContent = "Select a video to play";
+
+    persistAndRender();
+}
+
+/* =========================================================
+   NAMED PLAYLISTS
+========================================================= */
+
+function saveNamedPlaylist() {
+    const entered = prompt(
+        "Enter a name for this playlist:",
+        activePlaylistName === "Untitled Playlist"
+            ? ""
+            : activePlaylistName
+    );
+
+    if (entered === null) return;
+
+    const name = entered.trim();
+
+    if (!name) {
+        alert("Playlist name cannot be empty.");
+        return;
+    }
+
+    playlists[name] = clone(currentPlaylist);
     activePlaylistName = name;
 
     renderSavedPlaylists();
     $("savedPlaylistSelect").value = name;
 
     updateActiveName();
-    saveStorage();
-    setSaveStatus(`Saved "${name}"`);
+    saveStorageNow();
+
+    setSaveStatus(`Saved: ${name}`);
 }
 
 function loadNamedPlaylist() {
     const name = $("savedPlaylistSelect").value;
 
-    if (!name || !Object.prototype.hasOwnProperty.call(playlists, name)) {
-        alert("Select a saved playlist first.");
+    if (!name || !playlists[name]) {
+        alert("Select a saved playlist.");
         return;
     }
 
-    currentPlaylist = JSON.parse(JSON.stringify(playlists[name]));
+    currentPlaylist = clone(playlists[name]);
     activePlaylistName = name;
     selectedVideoId = null;
 
-    if (currentPlaylist.length > 0) {
+    if (currentPlaylist.length) {
         playVideo(currentPlaylist[0]);
     } else {
+        currentVideoUrl = null;
         $("videoPlayer").src = "about:blank";
         $("playerTitle").textContent = "Select a video to play";
     }
 
     persistAndRender();
-    setSaveStatus(`Loaded "${name}"`);
+    setSaveStatus(`Loaded: ${name}`);
 }
 
 function newPlaylist() {
-    const proceed = currentPlaylist.length === 0 ||
-        confirm("Start a new playlist? Your current playlist will remain saved.");
-
-    if (!proceed) return;
+    if (currentPlaylist.length &&
+        !confirm("Start a new playlist? Saved playlists will remain intact.")) {
+        return;
+    }
 
     currentPlaylist = [];
-    selectedVideoId = null;
     activePlaylistName = "Untitled Playlist";
+    selectedVideoId = null;
+    currentVideoUrl = null;
 
     $("videoPlayer").src = "about:blank";
     $("playerTitle").textContent = "Select a video to play";
@@ -285,12 +352,14 @@ function newPlaylist() {
 function deleteNamedPlaylist() {
     const name = $("savedPlaylistSelect").value;
 
-    if (!name || !Object.prototype.hasOwnProperty.call(playlists, name)) {
-        alert("Select a saved playlist first.");
+    if (!name || !playlists[name]) {
+        alert("Select a saved playlist.");
         return;
     }
 
-    if (!confirm(`Permanently delete "${name}"?`)) return;
+    if (!confirm(`Delete saved playlist "${name}"?`)) {
+        return;
+    }
 
     delete playlists[name];
 
@@ -300,56 +369,52 @@ function deleteNamedPlaylist() {
 
     renderSavedPlaylists();
     updateActiveName();
-    saveStorage();
-    setSaveStatus(`Deleted "${name}"`);
+    saveStorageNow();
+
+    setSaveStatus(`Deleted: ${name}`);
 }
 
-function clearCurrentPlaylist() {
-    if (currentPlaylist.length === 0) return;
+/* =========================================================
+   ACTIVE TAB VIDEO DETECTION
+========================================================= */
 
-    if (!confirm("Clear all videos from the active playlist?")) return;
+function requestCurrentVideo() {
+    chrome.tabs.query(
+        { active: true, currentWindow: true },
+        tabs => {
+            const tab = tabs?.[0];
 
-    currentPlaylist = [];
-    selectedVideoId = null;
-
-    $("videoPlayer").src = "about:blank";
-    $("playerTitle").textContent = "Select a video to play";
-
-    persistAndRender();
-}
-
-function getActiveTab() {
-    return new Promise(resolve => {
-        chrome.tabs.query({ active: true, currentWindow: true }, tabs => {
-            resolve(tabs && tabs.length ? tabs[0] : null);
-        });
-    });
-}
-
-async function requestCurrentVideo() {
-    const tab = await getActiveTab();
-
-    if (!tab || !tab.id) {
-        alert("Could not find the active browser tab.");
-        return;
-    }
-
-    chrome.runtime.sendMessage(
-        { type: "GET_ACTIVE_VIDEO", tabId: tab.id },
-        response => {
-            if (chrome.runtime.lastError) {
-                console.warn(chrome.runtime.lastError.message);
-                alert("Could not retrieve video from the active tab.");
+            if (!tab) {
+                alert("No active tab.");
                 return;
             }
 
-            if (response && response.url) {
-                addVideo(response.url, response.title || tab.title || "Video");
-            } else if (response && response.videoUrl) {
-                addVideo(response.videoUrl, response.title || tab.title || "Video");
-            } else {
-                alert("No supported video was detected in the active tab.");
-            }
+            chrome.runtime.sendMessage(
+                {
+                    type: "GET_ACTIVE_VIDEO",
+                    tabId: tab.id
+                },
+                response => {
+                    if (chrome.runtime.lastError) {
+                        alert("Could not detect video in active tab.");
+                        console.warn(chrome.runtime.lastError.message);
+                        return;
+                    }
+
+                    const url = response?.embedUrl ||
+                               response?.url ||
+                               response?.videoUrl;
+
+                    if (url) {
+                        addVideo(url, response.title || tab.title);
+                    } else {
+                        alert(
+                            "No supported video detected.\n\n" +
+                            "Open a supported video page first."
+                        );
+                    }
+                }
+            );
         }
     );
 }
@@ -357,43 +422,40 @@ async function requestCurrentVideo() {
 function handleDetectedVideo(message) {
     if (!message) return;
 
-    const url = message.url || message.videoUrl || message.embedUrl;
-    const title = message.title || "Detected Video";
+    const url = message.embedUrl ||
+                message.url ||
+                message.videoUrl;
 
     if (!url) return;
 
     currentVideoUrl = url;
-    currentVideoTitle = title;
-    updateStatus(true);
+    currentVideoTitle = message.title || "Detected Video";
 
     if (autoAdd && normalizeUrl(url) !== lastAutoAddedUrl) {
         lastAutoAddedUrl = normalizeUrl(url);
-        addVideo(url, title);
+        addVideo(url, currentVideoTitle);
     }
 }
 
-function openVideoInTab() {
-    if (!currentVideoUrl) {
-        alert("Select a video first.");
-        return;
-    }
-
-    chrome.tabs.create({ url: currentVideoUrl });
-}
+/* =========================================================
+   INITIALIZATION
+========================================================= */
 
 function initialize() {
     chrome.storage.local.get(
-        [
-            STORAGE_KEYS.playlists,
-            STORAGE_KEYS.current,
-            STORAGE_KEYS.activeName,
-            STORAGE_KEYS.autoAdd
-        ],
+        Object.values(STORAGE),
         data => {
-            playlists = data[STORAGE_KEYS.playlists] || {};
-            currentPlaylist = data[STORAGE_KEYS.current] || [];
-            activePlaylistName = data[STORAGE_KEYS.activeName] || "Untitled Playlist";
-            autoAdd = data[STORAGE_KEYS.autoAdd] === true;
+            if (chrome.runtime.lastError) {
+                console.error(chrome.runtime.lastError);
+                setSaveStatus("Storage unavailable");
+                return;
+            }
+
+            playlists = data[STORAGE.playlists] || {};
+            currentPlaylist = data[STORAGE.current] || [];
+            activePlaylistName =
+                data[STORAGE.activeName] || "Untitled Playlist";
+            autoAdd = data[STORAGE.autoAdd] === true;
 
             $("autoAddToggle").checked = autoAdd;
 
@@ -401,12 +463,11 @@ function initialize() {
             renderPlaylist();
             updateActiveName();
 
-            // Resume the last selected video if it still exists.
-            if (currentPlaylist.length > 0) {
+            if (currentPlaylist.length) {
                 playVideo(currentPlaylist[0]);
             }
 
-            saveStorage();
+            setSaveStatus("Ready");
         }
     );
 
@@ -420,23 +481,35 @@ function initialize() {
 
     $("autoAddToggle").addEventListener("change", event => {
         autoAdd = event.target.checked;
-        saveStorage();
+        saveStorageNow();
     });
 
-    // Receive detected videos from the background script.
     chrome.runtime.onMessage.addListener(message => {
-        if (message.type === "ACTIVE_VIDEO" || message.type === "VIDEO_DETECTED") {
+        if (
+            message.type === "ACTIVE_VIDEO" ||
+            message.type === "VIDEO_DETECTED"
+        ) {
             handleDetectedVideo(message);
         }
     });
 
-    // Ask the background script for the current tab's video.
-    chrome.runtime.sendMessage({ type: "GET_ACTIVE_VIDEO" }, response => {
-        if (chrome.runtime.lastError) return;
-        if (response) handleDetectedVideo(response);
-    });
+    // Request current active-tab video on sidebar startup.
+    requestInitialVideo();
 
-    updateStatus(true);
+    window.addEventListener("beforeunload", () => {
+        clearTimeout(saveTimer);
+        saveStorageNow();
+    });
+}
+
+function requestInitialVideo() {
+    chrome.runtime.sendMessage(
+        { type: "GET_ACTIVE_VIDEO" },
+        response => {
+            if (chrome.runtime.lastError) return;
+            if (response) handleDetectedVideo(response);
+        }
+    );
 }
 
 document.addEventListener("DOMContentLoaded", initialize);
